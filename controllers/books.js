@@ -1,3 +1,4 @@
+const { error } = require("console");
 const Book = require("../models/Book");
 const fs = require("fs");
 
@@ -26,22 +27,28 @@ exports.modifyBook = (req, res, next) => {
     imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename.split('.')[0]}.webp`,
   }
     : { ...req.body };
-  delete bookObject._userId;
+  //delete bookObject._userId;
+  console.log(req.body.book);
   Book.findOne({ _id: req.params.id })
     .then((book) => {
       if (book.userId != req.auth.userId) {
         res.status(401).json({ message: "non autorisé" });
       } else {
-        const fileToDelete = `images/${book.imageUrl.split('images/')[1]}`;
-        fs.unlink(fileToDelete, (err) => {
-          if (err) throw err;
-          Book.updateOne(
-            { _id: req.params.id },
-            { ...bookObject, _id: req.params.id }
-          )
-            .then(() => res.status(200).json({ message: "Objet modifié" }))
-            .catch((error) => res.status(401).json({ error }));
-        })
+        let previousImage = "";
+        if (req.file) {
+          previousImage = book.imageUrl.split('/images/')[1];
+        }
+        const bookToDelete = `images/${previousImage}`
+        Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
+          .then(() => {
+            if (previousImage) {
+              fs.unlink(bookToDelete, error => { });
+            }
+            res.status(200).json({ message: 'livre modifié' })
+          })
+          .catch(error => {
+            res.status(400).json({ error });
+          })
       }
     });
 };
@@ -89,15 +96,19 @@ exports.getOneBook = (req, res) => {
 exports.rateABook = (req, res) => {
 
   const grade = req.body.rating;
-  if (isNaN(grade) || grade < 0 || grade > 5) {
+  if (isNaN(grade) || grade < 1 || grade > 5) {
     return res.status(400).json({ message: 'Note invalide' })
   }
 
   Book.findOne({ _id: req.params.id })
     .then((book) => {
-      const alreadyGaveAGrade = book.ratings.find(rating => rating.userId === req.auth.userId);
+      if (!book) {
+        throw new Error('Livre Inéxistant')
+
+      }
+      const alreadyGaveAGrade = book.ratings.find(rating => rating.userId === req.body.userId);
       if (alreadyGaveAGrade) {
-        throw new Error('Vous avez déjà noté ce livre');
+        throw new Error('vous avez déjà noté ce livre')
       }
       book.ratings.push(
         {
@@ -113,8 +124,10 @@ exports.rateABook = (req, res) => {
       res.status(200).json(updatedBook);
     })
     .catch(error => {
-      if (error.message === 'Vous avez déjà noté ce livre') {
-        res.status(401).json({ message: error.message });
+      if (error.message === 'Livre Inéxistant') {
+        res.status(404).json({ message: error.message })
+      } else if (error.message === 'vous avez déjà noté ce livre') {
+        res.status(403).json({ message: error.message })
       } else {
         res.status(400).json({ error });
       }
