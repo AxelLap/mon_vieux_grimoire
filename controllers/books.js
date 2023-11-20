@@ -1,4 +1,4 @@
-const { error } = require("console");
+
 const Book = require("../models/Book");
 const fs = require("fs");
 
@@ -27,8 +27,7 @@ exports.modifyBook = (req, res, next) => {
     imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename.split('.')[0]}.webp`,
   }
     : { ...req.body };
-  //delete bookObject._userId;
-  console.log(req.body.book);
+
   Book.findOne({ _id: req.params.id })
     .then((book) => {
       if (book.userId != req.auth.userId) {
@@ -54,7 +53,7 @@ exports.modifyBook = (req, res, next) => {
 };
 
 exports.deleteBook = (req, res, next) => {
-  console.log(req.params.id);
+
   Book.findOne({ _id: req.params.id })
     .then((book) => {
       if (book.userId != req.auth.userId) {
